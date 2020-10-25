@@ -29,7 +29,7 @@ app.get('/', (reqeust, response) => {
 
 app.get('/location', (request, response) => {
     const locationData = require('./data/location.json');
-    const city = 'asa';
+    const city =request.query.city;
     let location;
     locationData.forEach(locationData => {
         location = new Location(city, locationData);
