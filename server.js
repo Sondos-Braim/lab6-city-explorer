@@ -1,5 +1,10 @@
-6
+
 'use strict';
+// const locationGet=require('./modules/location');
+// const weatherGet=require('./modules/weather');
+// const helperGet=require('./modules/helpers');
+
+
 // Constructor
 function Location(city, locationData) {
   this.search_query = city;
@@ -22,9 +27,24 @@ function Trail(locationData) {
   this.conditions = locationData.conditions;
   this.condition_date = locationData.conditionDate;
   this.condition_time = locationData.condition_time;
-
 }
-// Defining Application Dependencies
+function Movie(locationData){
+  this.title=locationData.title;
+  this.overview=locationData.overview;
+  this.average_votes=locationData.vote_average;
+  this.total_votes=locationData.vote_count;
+  this.image_url=locationData.poster_path;
+  this.popularity=locationData.popularity;
+  this.released_on=locationData.release_date;
+}
+function Yelp(locationData){
+  this.name=locationData.name;
+  this.image_url=locationData.image_url;
+  this.price=locationData.price;
+  this.rating=locationData.rating;
+  this.url=locationData.url;
+}
+// // Defining Application Dependencies
 const express = require('express');
 const superagent = require('superagent');
 const cors = require('cors');
@@ -36,6 +56,8 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const GEOCODE_API_KEY = process.env.GEOCODE_API_KEY;
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 const TRAIL_API_KEY = process.env.TRAIL_API_KEY;
+const MOVIE_API_KEY=process.env.MOVIE_API_KEY;
+const YELP_API_KEY=process.env.YELP_API_KEY;
 const app = express();
 app.use(cors());
 const client = new pg.Client(DATABASE_URL);
@@ -49,18 +71,20 @@ app.get('/', welcomePage);
 app.get('/location', locationData);
 app.get('/weather', weatherData);
 app.get('/trails', trailData);
-// app.get('/add-location',(request,response)=>{
-//   const search_query=request.query.search_query;
-//   const formated_query=request.query.formated_query;
-//   const latitude=request.query.latitude;
-//   const longitude=request.query.longitude;
-//   const insert='INSERT INTO location_info (search_query,formated_query,latitude,longitude) VALUES ($1,$2,$3,$4);';
-//   const safeValues=[search_query,formated_query,latitude,longitude];
-//   client.query(insert,safeValues).then(result=>{
-//     response.status(200).json(result.rows);
-//   });
+app.get('/movies',moviesData);
+app.get('/yelp',yelpData);
+app.get('/add-location',(request,response)=>{
+  const search_query=request.query.search_query;
+  const formated_query=request.query.formated_query;
+  const latitude=request.query.latitude;
+  const longitude=request.query.longitude;
+  const insert='INSERT INTO location_info (search_query,formated_query,latitude,longitude) VALUES ($1,$2,$3,$4);';
+  const safeValues=[search_query,formated_query,latitude,longitude];
+  client.query(insert,safeValues).then(result=>{
+    response.status(200).json(result.rows);
+  });
 
-// });
+});
 app.use('*', notFound);
 // function handlErrors(response) {
 //     if (response.status === 500) {
@@ -135,7 +159,53 @@ function trailData(request, response) {
     // handlErrors(response);
   }).catch(console.error);
 }
+function moviesData(request,response){
+  const city=request.query.search_query;
+  const url=`https://api.themoviedb.org/4/search/movie?api_key=${MOVIE_API_KEY}&query=${city}`;
+  let moviesArr = [];
+  superagent.get(url).then(locationData => {
+    // console.log(locationData.body);
+    console.log(locationData.body.results);
 
+    moviesArr=locationData.body.results.map((data) => {
+      return(new Movie(data));
+    });
+
+
+    response.json(moviesArr);
+  }).catch(console.error);
+
+}
+function yelpData(request,response){
+  const city=request.query.search_query;
+  const page=request.query.page;
+  let pagNum = 5;
+  let beginnigPage = (page-1)*pagNum;
+  // let yelpArr = [];
+  const url=`https://api.yelp.com/v3/businesses/search`;
+  const parameters = {
+    location: city,
+    categories:'Restaurants ',
+    limit:5,
+    offset : beginnigPage
+  };
+  superagent.get(url).query(parameters)
+    .set('Authorization', `Bearer ${YELP_API_KEY}`).then(locationData=>{
+      let arrayOfyelp=[];
+      let dataYelp=locationData.body.businesses;
+      arrayOfyelp = dataYelp.map((yelp) => {
+
+        let yelpObj = new Yelp(yelp);
+        return yelpObj;
+
+      });
+      response.send(arrayOfyelp);
+    }).catch(error=>{
+      console.log(error);
+    });
+
+
+}
 function notFound(request, resp) {
   resp.status(404).send('Not found');
 }
