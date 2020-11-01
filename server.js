@@ -1,8 +1,5 @@
-
 'use strict';
-// const locationGet=require('./modules/location');
-// const weatherGet=require('./modules/weather');
-// const helperGet=require('./modules/helpers');
+
 
 
 // Constructor
@@ -33,7 +30,7 @@ function Movie(locationData){
   this.overview=locationData.overview;
   this.average_votes=locationData.vote_average;
   this.total_votes=locationData.vote_count;
-  this.image_url=locationData.poster_path;
+  this.image_url=`https://image.tmdb.org/t/p/w500${locationData.poster_path}`;
   this.popularity=locationData.popularity;
   this.released_on=locationData.release_date;
 }
@@ -73,24 +70,8 @@ app.get('/weather', weatherData);
 app.get('/trails', trailData);
 app.get('/movies',moviesData);
 app.get('/yelp',yelpData);
-app.get('/add-location',(request,response)=>{
-  const search_query=request.query.search_query;
-  const formated_query=request.query.formated_query;
-  const latitude=request.query.latitude;
-  const longitude=request.query.longitude;
-  const insert='INSERT INTO location_info (search_query,formated_query,latitude,longitude) VALUES ($1,$2,$3,$4);';
-  const safeValues=[search_query,formated_query,latitude,longitude];
-  client.query(insert,safeValues).then(result=>{
-    response.status(200).json(result.rows);
-  });
+app.use('*', notFound);// all of the paths that do not exist it will show a messege not found
 
-});
-app.use('*', notFound);
-// function handlErrors(response) {
-//     if (response.status === 500) {
-//         response.status(500).send('Sorry, something went wrong');
-//     }
-// }
 // Helpers
 function welcomePage(reqeust, response) {
   response.status(200).send('Home Page Welcome to express');
@@ -103,23 +84,20 @@ function locationData(request, response) {
   client.query(selectLocation).then(result => {
     console.log(result.rows);
     if (result.rows.length > 0) {
-      // location = new Location(city, result.rows[0]);
       console.log(result.rows[0]);
       console.log(location);
 
-      response.status(200).json(result.rows[0]);
+      response.status(200).json(result.rows[0]); //the selected row is inside an array we will reach it using the index
     }
     else {
       const url = `https://eu1.locationiq.com/v1/search.php?key=${GEOCODE_API_KEY}&q=${city}&format=json`;
       superagent.get(url).then(locationData => {
         location = new Location(city, locationData.body);
-        // response.json(location);
-        const insert = 'INSERT INTO location_info (search_query,formated_query,latitude,longitude) VALUES ($1,$2,$3,$4);';
+        const insert = 'INSERT INTO location_info (search_query,formated_query,latitude,longitude) VALUES ($1,$2,$3,$4) RETURNING *;';
         const safeValues = [location.search_query, location.formated_query, location.latitude, location.longitude];
         client.query(insert, safeValues).then(result => {
-          response.status(200).json(location);
+          response.status(200).json(result.rows);
         });
-        // handlErrors(response);
       });
     }
 
@@ -140,9 +118,7 @@ function weatherData(request, response) {
     });
 
     response.json(weatherArr);
-    // handlErrors(response);
   });
-  // .catch(console.error);
 }
 function trailData(request, response) {
   const longitude = request.query.longitude;
@@ -153,10 +129,7 @@ function trailData(request, response) {
     locationData.body.trails.map((data) => {
       trailArr.push(new Trail(data));
     });
-
-
     response.json(trailArr);
-    // handlErrors(response);
   }).catch(console.error);
 }
 function moviesData(request,response){
@@ -164,30 +137,25 @@ function moviesData(request,response){
   const url=`https://api.themoviedb.org/4/search/movie?api_key=${MOVIE_API_KEY}&query=${city}`;
   let moviesArr = [];
   superagent.get(url).then(locationData => {
-    // console.log(locationData.body);
     console.log(locationData.body.results);
 
     moviesArr=locationData.body.results.map((data) => {
       return(new Movie(data));
     });
-
-
     response.json(moviesArr);
   }).catch(console.error);
-
 }
 function yelpData(request,response){
   const city=request.query.search_query;
   const page=request.query.page;
   let pagNum = 5;
   let beginnigPage = (page-1)*pagNum;
-  // let yelpArr = [];
   const url=`https://api.yelp.com/v3/businesses/search`;
   const parameters = {
     location: city,
     categories:'Restaurants ',
     limit:5,
-    offset : beginnigPage
+    offset : beginnigPage,
   };
   superagent.get(url).query(parameters)
     .set('Authorization', `Bearer ${YELP_API_KEY}`).then(locationData=>{
@@ -197,14 +165,11 @@ function yelpData(request,response){
 
         let yelpObj = new Yelp(yelp);
         return yelpObj;
-
       });
       response.send(arrayOfyelp);
     }).catch(error=>{
       console.log(error);
     });
-
-
 }
 function notFound(request, resp) {
   resp.status(404).send('Not found');
